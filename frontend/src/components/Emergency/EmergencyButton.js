@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Button, Typography } from '@mui/material';
-import { Emergency as EmergencyIcon } from '@mui/icons-material';
+import { LocalHospital as EmergencyIcon } from '@mui/icons-material';
 
 const EmergencyButton = () => {
   const handleEmergencyPress = () => {

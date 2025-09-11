@@ -25,31 +25,48 @@ import NotFoundPage from './pages/NotFound/NotFoundPage';
 
 // Services
 import { authService } from './services/authService';
-import { setAuthenticated } from './store/slices/authSlice';
+import { setAuthenticated, loginStart, loginFailure } from './store/slices/authSlice';
 
 function App() {
   const dispatch = useDispatch();
   const location = useLocation();
   const { isAuthenticated, loading } = useSelector((state) => state.auth);
-  const { loading: globalLoading } = useSelector((state) => state.ui);
+  // Temporarily disable global loading to fix infinite loading issue
+  // const { loading: { global: globalLoading } } = useSelector((state) => state.ui);
+  const globalLoading = false;
 
   useEffect(() => {
     // Check if user is authenticated on app load
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
       if (token) {
+        dispatch(loginStart()); // Set loading to true
         try {
-          const response = await authService.verifyToken();
+          // Add timeout to prevent infinite loading
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Authentication timeout')), 10000);
+          });
+          
+          const response = await Promise.race([
+            authService.verifyToken(),
+            timeoutPromise
+          ]);
+          
           if (response.valid) {
             dispatch(setAuthenticated(true));
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
+            dispatch(setAuthenticated(false));
           }
         } catch (error) {
+          console.error('Auth check error:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
+          dispatch(loginFailure('Authentication failed'));
         }
+      } else {
+        dispatch(setAuthenticated(false));
       }
     };
 

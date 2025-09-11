@@ -55,7 +55,15 @@ const LoginPage = () => {
     setLoading(true);
     try {
       const response = await authService.login(data.email, data.password);
-      dispatch(loginSuccess(response));
+      
+      // Transform the response to match what authSlice expects
+      const authData = {
+        user: response.data.user,
+        token: response.data.accessToken,
+        refreshToken: response.data.refreshToken
+      };
+      
+      dispatch(loginSuccess(authData));
       toast.success('Login successful!');
       navigate(from, { replace: true });
     } catch (error) {

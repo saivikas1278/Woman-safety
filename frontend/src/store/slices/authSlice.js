@@ -54,6 +54,10 @@ const authSlice = createSlice({
     },
     setAuthenticated: (state, action) => {
       state.isAuthenticated = action.payload;
+      state.loading = false; // Stop loading when authentication is set
+    },
+    setLoading: (state, action) => {
+      state.loading = action.payload;
     },
   },
 });
@@ -67,6 +71,7 @@ export const {
   updateLocation,
   clearError,
   setAuthenticated,
+  setLoading,
 } = authSlice.actions;
 
 export default authSlice.reducer;

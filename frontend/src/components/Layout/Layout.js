@@ -32,7 +32,7 @@ import {
   Logout as LogoutIcon,
   Notifications as NotificationIcon,
   AdminPanelSettings as AdminIcon,
-  Emergency as EmergencyIcon,
+  LocalHospital as EmergencyIcon,
 } from '@mui/icons-material';
 
 import { logout } from '../../store/slices/authSlice';

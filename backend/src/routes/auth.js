@@ -421,13 +421,140 @@ const logout = async (req, res) => {
   }
 };
 
+// @desc    Verify JWT token
+// @route   GET /api/auth/verify-token
+// @access  Private
+const verifyToken = async (req, res) => {
+  try {
+    // If we reach here, the auth middleware has already validated the token
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      valid: true,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        isVerified: user.isVerified,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    logger.error('Verify token error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error during token verification'
+    });
+  }
+};
+
+// @desc    Get user profile
+// @route   GET /api/auth/profile
+// @access  Private
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          role: user.role,
+          emergencyContacts: user.emergencyContacts,
+          location: user.location
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Get profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while fetching profile'
+    });
+  }
+};
+
+// @desc    Update user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+const updateProfile = async (req, res) => {
+  try {
+    const { name, phone, emergencyContacts, location } = req.body;
+    
+    const user = await User.findById(req.user.id);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Update fields if provided
+    if (name) user.name = name;
+    if (phone) user.phone = phone;
+    if (emergencyContacts) user.emergencyContacts = emergencyContacts;
+    if (location) user.location = location;
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          isVerified: user.isVerified,
+          role: user.role,
+          emergencyContacts: user.emergencyContacts,
+          location: user.location
+        }
+      }
+    });
+  } catch (error) {
+    logger.error('Update profile error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error while updating profile'
+    });
+  }
+};
+
 // Routes
 router.post('/register', validateRegistration, register);
 router.post('/login', validateLogin, login);
 router.post('/refresh', refreshToken);
+router.post('/refresh-token', refreshToken);
 router.post('/verify', auth, verifyAccount);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
+router.get('/verify-token', auth, verifyToken);
+router.get('/profile', auth, getProfile);
+router.put('/profile', auth, updateProfile);
 router.put('/change-password', auth, validatePasswordChange, changePassword);
 router.post('/logout', auth, logout);
 

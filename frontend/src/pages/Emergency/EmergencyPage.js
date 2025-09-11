@@ -1,7 +1,7 @@
 import React from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Typography, Box, Button } from '@mui/material';
-import { Emergency as EmergencyIcon } from '@mui/icons-material';
+import { LocalHospital as EmergencyIcon } from '@mui/icons-material';
 
 const EmergencyPage = () => {
   return (

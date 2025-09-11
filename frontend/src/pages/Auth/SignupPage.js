@@ -76,8 +76,15 @@ const SignupPage = () => {
       const { confirmPassword, termsAccepted, ...userData } = data;
       const response = await authService.register(userData);
       
+      // Transform the response to match what authSlice expects
+      const authData = {
+        user: response.data.user,
+        token: response.data.accessToken,
+        refreshToken: response.data.refreshToken
+      };
+      
       // Auto-login after registration
-      dispatch(loginSuccess(response));
+      dispatch(loginSuccess(authData));
       toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (error) {
