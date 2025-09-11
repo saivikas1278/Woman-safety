@@ -1,0 +1,19 @@
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T08:13:13.511Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T08:13:13.525Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T08:13:13.580Z"}
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T14:59:58.259Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T14:59:58.268Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T14:59:58.295Z"}
+{"level":"warn","message":"MongoDB disconnected","service":"women-safety-backend","timestamp":"2025-09-11T15:00:25.385Z"}
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T15:00:30.570Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T15:00:30.578Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T15:00:30.596Z"}
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T15:15:41.780Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T15:15:41.794Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T15:15:41.846Z"}
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T15:20:06.162Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T15:20:06.174Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T15:20:06.231Z"}
+{"level":"info","message":"Socket.IO server initialized","service":"women-safety-backend","timestamp":"2025-09-11T15:44:10.524Z"}
+{"level":"info","message":"Server running in development mode on port 5000","service":"women-safety-backend","timestamp":"2025-09-11T15:44:10.541Z"}
+{"level":"info","message":"MongoDB Connected: localhost","service":"women-safety-backend","timestamp":"2025-09-11T15:44:10.578Z"}

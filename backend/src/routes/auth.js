@@ -1,0 +1,434 @@
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
+const User = require('../models/User');
+const { auth } = require('../middleware/auth');
+const { validateRegistration, validateLogin, validatePasswordChange } = require('../middleware/validation');
+const logger = require('../utils/logger');
+const { sendSMS, sendEmail } = require('../services/notificationService');
+
+const router = express.Router();
+
+// Generate JWT tokens
+const generateTokens = (userId) => {
+  const accessToken = jwt.sign(
+    { id: userId },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRE || '15m' }
+  );
+  
+  const refreshToken = jwt.sign(
+    { id: userId },
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRE || '7d' }
+  );
+  
+  return { accessToken, refreshToken };
+};
+
+// @desc    Register new user
+// @route   POST /api/auth/register
+// @access  Public
+const register = async (req, res) => {
+  try {
+    const { name, email, phone, password } = req.body;
+
+    // Check if user already exists
+    const existingUser = await User.findOne({
+      $or: [{ email }, { phone }]
+    });
+
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'User with this email or phone already exists'
+      });
+    }
+
+    // Create verification token
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+
+    // Create user
+    const user = new User({
+      name,
+      email,
+      phone,
+      password,
+      verificationToken
+    });
+
+    await user.save();
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    // Send verification SMS/Email
+    try {
+      await sendSMS(phone, `Welcome to Women Safety! Your verification code is: ${verificationToken.substring(0, 6)}`);
+      // await sendEmail(email, 'Verify Your Account', `Please verify your account using this code: ${verificationToken.substring(0, 6)}`);
+    } catch (notificationError) {
+      logger.error('Failed to send verification:', notificationError);
+    }
+
+    logger.info(`New user registered: ${email}`);
+
+    res.status(201).json({
+      success: true,
+      message: 'User registered successfully. Please verify your account.',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isVerified: user.isVerified
+        },
+        accessToken,
+        refreshToken
+      }
+    });
+
+  } catch (error) {
+    logger.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to register user'
+    });
+  }
+};
+
+// @desc    Login user
+// @route   POST /api/auth/login
+// @access  Public
+const login = async (req, res) => {
+  try {
+    const { email, phone, password } = req.body;
+
+    // Find user by email or phone
+    const user = await User.findOne({
+      $or: [
+        ...(email ? [{ email }] : []),
+        ...(phone ? [{ phone }] : [])
+      ],
+      isActive: true
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Check password
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid credentials'
+      });
+    }
+
+    // Update last active
+    await user.updateLastActive();
+
+    // Generate tokens
+    const { accessToken, refreshToken } = generateTokens(user._id);
+
+    logger.info(`User logged in: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Login successful',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isVerified: user.isVerified,
+          lastActive: user.lastActive
+        },
+        accessToken,
+        refreshToken
+      }
+    });
+
+  } catch (error) {
+    logger.error('Login error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to login'
+    });
+  }
+};
+
+// @desc    Refresh access token
+// @route   POST /api/auth/refresh
+// @access  Public
+const refreshToken = async (req, res) => {
+  try {
+    const { refreshToken: token } = req.body;
+
+    if (!token) {
+      return res.status(401).json({
+        success: false,
+        message: 'Refresh token is required'
+      });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET);
+    const user = await User.findById(decoded.id).select('-password');
+
+    if (!user || !user.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid refresh token'
+      });
+    }
+
+    // Generate new tokens
+    const { accessToken, refreshToken: newRefreshToken } = generateTokens(user._id);
+
+    res.json({
+      success: true,
+      data: {
+        accessToken,
+        refreshToken: newRefreshToken
+      }
+    });
+
+  } catch (error) {
+    logger.error('Refresh token error:', error);
+    res.status(401).json({
+      success: false,
+      message: 'Invalid refresh token'
+    });
+  }
+};
+
+// @desc    Verify account with OTP
+// @route   POST /api/auth/verify
+// @access  Private
+const verifyAccount = async (req, res) => {
+  try {
+    const { verificationCode } = req.body;
+
+    if (!verificationCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Verification code is required'
+      });
+    }
+
+    const user = await User.findById(req.user.id);
+    
+    if (!user.verificationToken || !user.verificationToken.startsWith(verificationCode)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid verification code'
+      });
+    }
+
+    user.isVerified = true;
+    user.verificationToken = undefined;
+    await user.save();
+
+    logger.info(`User verified: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Account verified successfully',
+      data: {
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          role: user.role,
+          isVerified: user.isVerified
+        }
+      }
+    });
+
+  } catch (error) {
+    logger.error('Verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to verify account'
+    });
+  }
+};
+
+// @desc    Forgot password
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+  try {
+    const { email, phone } = req.body;
+
+    const user = await User.findOne({
+      $or: [
+        ...(email ? [{ email }] : []),
+        ...(phone ? [{ phone }] : [])
+      ],
+      isActive: true
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetCode = resetToken.substring(0, 6).toUpperCase();
+
+    user.passwordResetToken = resetToken;
+    user.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    // Send reset code via SMS
+    try {
+      await sendSMS(user.phone, `Your password reset code is: ${resetCode}. Valid for 10 minutes.`);
+    } catch (notificationError) {
+      logger.error('Failed to send reset code:', notificationError);
+    }
+
+    res.json({
+      success: true,
+      message: 'Password reset code sent to your phone'
+    });
+
+  } catch (error) {
+    logger.error('Forgot password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to process password reset request'
+    });
+  }
+};
+
+// @desc    Reset password
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+  try {
+    const { resetCode, newPassword } = req.body;
+
+    if (!resetCode || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reset code and new password are required'
+      });
+    }
+
+    const user = await User.findOne({
+      passwordResetToken: { $regex: new RegExp(resetCode, 'i') },
+      passwordResetExpires: { $gt: Date.now() },
+      isActive: true
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired reset code'
+      });
+    }
+
+    user.password = newPassword;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    logger.info(`Password reset for user: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Password reset successfully'
+    });
+
+  } catch (error) {
+    logger.error('Reset password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to reset password'
+    });
+  }
+};
+
+// @desc    Change password
+// @route   PUT /api/auth/change-password
+// @access  Private
+const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user.id);
+    
+    // Verify current password
+    const isCurrentPasswordValid = await user.comparePassword(currentPassword);
+    if (!isCurrentPasswordValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Current password is incorrect'
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    logger.info(`Password changed for user: ${user.email}`);
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+
+  } catch (error) {
+    logger.error('Change password error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to change password'
+    });
+  }
+};
+
+// @desc    Logout user
+// @route   POST /api/auth/logout
+// @access  Private
+const logout = async (req, res) => {
+  try {
+    // In a more complex setup, you would invalidate the refresh token here
+    // For now, we'll just return success as JWT tokens are stateless
+    
+    res.json({
+      success: true,
+      message: 'Logged out successfully'
+    });
+
+  } catch (error) {
+    logger.error('Logout error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to logout'
+    });
+  }
+};
+
+// Routes
+router.post('/register', validateRegistration, register);
+router.post('/login', validateLogin, login);
+router.post('/refresh', refreshToken);
+router.post('/verify', auth, verifyAccount);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.put('/change-password', auth, validatePasswordChange, changePassword);
+router.post('/logout', auth, logout);
+
+module.exports = router;
