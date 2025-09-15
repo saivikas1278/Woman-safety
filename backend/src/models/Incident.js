@@ -14,7 +14,7 @@ const incidentSchema = new mongoose.Schema({
   device: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Device',
-    required: true
+    required: false  // Not all incidents require a device (manual web/app emergencies)
   },
   type: {
     type: String,
@@ -210,8 +210,7 @@ const incidentSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
-incidentSchema.index({ incidentId: 1 });
+// Indexes (incidentId index is created automatically by unique: true)
 incidentSchema.index({ user: 1, createdAt: -1 });
 incidentSchema.index({ device: 1, createdAt: -1 });
 incidentSchema.index({ status: 1, priority: 1 });

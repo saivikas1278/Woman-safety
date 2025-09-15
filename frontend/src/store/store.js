@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import authReducer from './slices/authSlice';
-import incidentReducer from './slices/incidentSlice';
+// ...existing code...
 import deviceReducer from './slices/deviceSlice';
 import socketReducer from './slices/socketSlice';
 import uiReducer from './slices/uiSlice';
@@ -8,7 +8,7 @@ import uiReducer from './slices/uiSlice';
 export const store = configureStore({
   reducer: {
     auth: authReducer,
-    incidents: incidentReducer,
+// ...existing code...
     devices: deviceReducer,
     socket: socketReducer,
     ui: uiReducer,

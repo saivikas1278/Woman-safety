@@ -14,7 +14,7 @@ import LoginPage from './pages/Auth/LoginPage';
 import SignupPage from './pages/Auth/SignupPage';
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
 import Dashboard from './pages/Dashboard/Dashboard';
-import IncidentsPage from './pages/Incidents/IncidentsPage';
+// ...existing code...
 import DevicesPage from './pages/Devices/DevicesPage';
 import ContactsPage from './pages/Contacts/ContactsPage';
 import SettingsPage from './pages/Settings/SettingsPage';
@@ -141,11 +141,11 @@ function App() {
           }
         />
         <Route
-          path="/incidents"
+// ...existing code...
           element={
             <ProtectedRoute>
               <Layout>
-                <IncidentsPage />
+// ...existing code...
               </Layout>
             </ProtectedRoute>
           }

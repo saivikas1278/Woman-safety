@@ -120,48 +120,6 @@ export const authService = {
   },
 };
 
-export const incidentService = {
-  getIncidents: async (params = {}) => {
-    const response = await api.get('/incidents', { params });
-    return response.data;
-  },
-
-  getIncident: async (id) => {
-    const response = await api.get(`/incidents/${id}`);
-    return response.data;
-  },
-
-  createIncident: async (incidentData) => {
-    const response = await api.post('/incidents', incidentData);
-    return response.data;
-  },
-
-  updateIncident: async (id, updateData) => {
-    const response = await api.put(`/incidents/${id}`, updateData);
-    return response.data;
-  },
-
-  resolveIncident: async (id, resolutionData) => {
-    const response = await api.post(`/incidents/${id}/resolve`, resolutionData);
-    return response.data;
-  },
-
-  addLocationUpdate: async (id, location) => {
-    const response = await api.post(`/incidents/${id}/location`, { location });
-    return response.data;
-  },
-
-  assignResponder: async (id, responderId) => {
-    const response = await api.post(`/incidents/${id}/assign`, { responderId });
-    return response.data;
-  },
-
-  escalateIncident: async (id) => {
-    const response = await api.post(`/incidents/${id}/escalate`);
-    return response.data;
-  },
-};
-
 export const deviceService = {
   getDevices: async () => {
     const response = await api.get('/devices');
@@ -213,6 +171,11 @@ export const contactService = {
     return response.data;
   },
 
+  getContactStats: async () => {
+    const response = await api.get('/contacts/stats');
+    return response.data;
+  },
+
   addContact: async (contactData) => {
     const response = await api.post('/contacts', contactData);
     return response.data;
@@ -230,6 +193,42 @@ export const contactService = {
 
   testContact: async (id) => {
     const response = await api.post(`/contacts/${id}/test`);
+    return response.data;
+  },
+
+  verifyContact: async (id, verificationCode) => {
+    const response = await api.post(`/contacts/${id}/verify`, { verificationCode });
+    return response.data;
+  },
+
+  reorderContacts: async (contactIds) => {
+    const response = await api.put('/contacts/reorder', { contactIds });
+    return response.data;
+  },
+
+  sendEmergencyAlert: async (alertData) => {
+    const response = await api.post('/contacts/emergency-alert', alertData);
+    return response.data;
+  },
+
+  // Auto-dial emergency functions
+  initiateAutoDial: async (emergencyData) => {
+    const response = await api.post('/contacts/emergency/auto-dial', emergencyData);
+    return response.data;
+  },
+
+  getAutoDialStatus: async (incidentId) => {
+    const response = await api.get(`/contacts/emergency/auto-dial/status/${incidentId}`);
+    return response.data;
+  },
+
+  testAutoDial: async (testPhoneNumber) => {
+    const response = await api.post('/contacts/emergency/auto-dial/test', { testPhoneNumber });
+    return response.data;
+  },
+
+  bulkImportContacts: async (contacts) => {
+    const response = await api.post('/contacts/bulk-import', { contacts });
     return response.data;
   },
 };

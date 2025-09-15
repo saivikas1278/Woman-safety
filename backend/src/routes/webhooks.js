@@ -283,9 +283,250 @@ const handleLowBattery = async (device, data) => {
   // TODO: Send push notification or SMS to user about low battery
 };
 
+// @desc    Generate TwiML for emergency calls
+// @route   GET /api/webhooks/twilio/emergency-twiml
+// @access  Public (Twilio webhook)
+const handleEmergencyTwiML = async (req, res) => {
+  try {
+    const { userName, emergencyType, contactName, latitude, longitude, timestamp } = req.query;
+
+    const locationText = latitude && longitude 
+      ? `The emergency location is latitude ${latitude}, longitude ${longitude}.`
+      : 'Location information is not available.';
+
+    const emergencyMessage = `
+      Hello ${contactName || 'Emergency Contact'}. 
+      This is an automated emergency alert from the Women's Safety Application.
+      ${userName || 'A user'} has activated an emergency alert.
+      Emergency type: ${emergencyType || 'General emergency'}.
+      ${locationText}
+      Time of emergency: ${new Date(timestamp).toLocaleString()}.
+      
+      Press 1 to acknowledge that you have received this alert and will provide assistance.
+      Press 2 if you cannot help at this time.
+      Press 0 to repeat this message.
+    `;
+
+    const twiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Gather input="dtmf" timeout="30" numDigits="1" action="/api/webhooks/twilio/emergency-response">
+          <Say voice="alice" language="en-US">${emergencyMessage}</Say>
+        </Gather>
+        <Say voice="alice" language="en-US">No response received. This call will now end. Please call back if you can provide assistance.</Say>
+        <Hangup/>
+      </Response>
+    `;
+
+    res.type('text/xml');
+    res.send(twiml);
+
+  } catch (error) {
+    logger.error('Emergency TwiML generation error:', error);
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say voice="alice" language="en-US">Emergency system error. Please call emergency services directly.</Say>
+        <Hangup/>
+      </Response>
+    `;
+    res.type('text/xml').send(errorTwiml);
+  }
+};
+
+// @desc    Handle emergency call responses (DTMF input)
+// @route   POST /api/webhooks/twilio/emergency-response
+// @access  Public (Twilio webhook)
+const handleEmergencyResponse = async (req, res) => {
+  try {
+    const { Digits, CallSid, From, To } = req.body;
+
+    logger.info(`Emergency response received: ${Digits} from ${From} (CallSid: ${CallSid})`);
+
+    let responseMessage = '';
+    let responseAction = '';
+
+    switch (Digits) {
+      case '1':
+        responseMessage = 'Thank you for acknowledging this emergency alert. Your assistance is greatly appreciated. Emergency services may also be notified.';
+        responseAction = 'acknowledged';
+        break;
+      case '2':
+        responseMessage = 'Thank you for responding. We understand you cannot help at this time. Other contacts will be notified.';
+        responseAction = 'declined';
+        break;
+      case '0':
+        // Redirect back to main message
+        const redirectTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Redirect>/api/webhooks/twilio/emergency-twiml?${req.body.originalParams || ''}</Redirect>
+          </Response>
+        `;
+        res.type('text/xml').send(redirectTwiml);
+        return;
+      default:
+        responseMessage = 'Invalid response. Press 1 to acknowledge, 2 if you cannot help, or 0 to repeat the message.';
+        const retryTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+          <Response>
+            <Gather input="dtmf" timeout="15" numDigits="1" action="/api/webhooks/twilio/emergency-response">
+              <Say voice="alice" language="en-US">${responseMessage}</Say>
+            </Gather>
+            <Say voice="alice" language="en-US">Call ended. Please call back if you can provide assistance.</Say>
+            <Hangup/>
+          </Response>
+        `;
+        res.type('text/xml').send(retryTwiml);
+        return;
+    }
+
+    // Log the response to database
+    await logEmergencyCallResponse(CallSid, From, responseAction, Digits);
+
+    const finalTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say voice="alice" language="en-US">${responseMessage}</Say>
+        <Hangup/>
+      </Response>
+    `;
+
+    res.type('text/xml').send(finalTwiml);
+
+  } catch (error) {
+    logger.error('Emergency response webhook error:', error);
+    const errorTwiml = `<?xml version="1.0" encoding="UTF-8"?>
+      <Response>
+        <Say voice="alice" language="en-US">System error. Thank you for your response.</Say>
+        <Hangup/>
+      </Response>
+    `;
+    res.type('text/xml').send(errorTwiml);
+  }
+};
+
+// @desc    Handle call status updates from Twilio
+// @route   POST /api/webhooks/twilio/call-status
+// @access  Public (Twilio webhook)
+const handleCallStatus = async (req, res) => {
+  try {
+    const { CallSid, CallStatus, CallDuration, To, From } = req.body;
+
+    logger.info(`Call status update: ${CallSid} - ${CallStatus} (Duration: ${CallDuration}s)`);
+
+    // Log call status to database
+    await logCallStatus(CallSid, CallStatus, CallDuration, To, From);
+
+    // If call failed, might want to trigger backup actions
+    if (CallStatus === 'failed' || CallStatus === 'busy' || CallStatus === 'no-answer') {
+      logger.warn(`Emergency call failed: ${CallSid} to ${To} (Status: ${CallStatus})`);
+      // TODO: Trigger backup emergency actions (SMS, email, or call next contact)
+    }
+
+    res.status(200).send('OK');
+
+  } catch (error) {
+    logger.error('Call status webhook error:', error);
+    res.status(500).send('Error');
+  }
+};
+
+// @desc    Handle recording status updates from Twilio
+// @route   POST /api/webhooks/twilio/recording-status
+// @access  Public (Twilio webhook)
+const handleRecordingStatus = async (req, res) => {
+  try {
+    const { RecordingSid, RecordingUrl, CallSid, RecordingStatus } = req.body;
+
+    logger.info(`Recording status: ${RecordingSid} - ${RecordingStatus}`);
+
+    if (RecordingStatus === 'completed' && RecordingUrl) {
+      // Store recording URL for emergency documentation
+      await saveEmergencyRecording(CallSid, RecordingSid, RecordingUrl);
+    }
+
+    res.status(200).send('OK');
+
+  } catch (error) {
+    logger.error('Recording status webhook error:', error);
+    res.status(500).send('Error');
+  }
+};
+
+// Helper functions for call logging
+const logEmergencyCallResponse = async (callSid, contactPhone, action, digits) => {
+  try {
+    // Store in database for emergency audit trail
+    const EmergencyCall = require('../models/EmergencyCall'); // You'll need to create this model
+    
+    await EmergencyCall.findOneAndUpdate(
+      { callSid },
+      {
+        $push: {
+          responses: {
+            contactPhone,
+            action,
+            digits,
+            timestamp: new Date()
+          }
+        }
+      },
+      { upsert: true }
+    );
+
+    logger.info(`Emergency call response logged: ${callSid} - ${action}`);
+  } catch (error) {
+    logger.error('Failed to log emergency call response:', error);
+  }
+};
+
+const logCallStatus = async (callSid, status, duration, to, from) => {
+  try {
+    const EmergencyCall = require('../models/EmergencyCall');
+    
+    await EmergencyCall.findOneAndUpdate(
+      { callSid },
+      {
+        status,
+        duration: parseInt(duration) || 0,
+        to,
+        from,
+        lastStatusUpdate: new Date()
+      },
+      { upsert: true }
+    );
+
+  } catch (error) {
+    logger.error('Failed to log call status:', error);
+  }
+};
+
+const saveEmergencyRecording = async (callSid, recordingSid, recordingUrl) => {
+  try {
+    const EmergencyCall = require('../models/EmergencyCall');
+    
+    await EmergencyCall.findOneAndUpdate(
+      { callSid },
+      {
+        recording: {
+          sid: recordingSid,
+          url: recordingUrl,
+          downloadedAt: null // Can download and store locally later
+        }
+      }
+    );
+
+    logger.info(`Emergency recording saved: ${recordingSid} for call ${callSid}`);
+  } catch (error) {
+    logger.error('Failed to save emergency recording:', error);
+  }
+};
+
 // Routes
 router.post('/voice-response', handleVoiceResponse);
 router.post('/sms-response', handleSMSResponse);
 router.post('/device/:serialNumber', handleDeviceWebhook);
+
+// Twilio Auto-Dial Webhooks
+router.get('/twilio/emergency-twiml', handleEmergencyTwiML);
+router.post('/twilio/emergency-response', handleEmergencyResponse);
+router.post('/twilio/call-status', handleCallStatus);
+router.post('/twilio/recording-status', handleRecordingStatus);
 
 module.exports = router;

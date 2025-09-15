@@ -15,7 +15,6 @@ const initialState = {
   dialogs: {
     emergencyConfirm: false,
     devicePairing: false,
-    incidentDetails: false,
   },
   snackbar: {
     open: false,

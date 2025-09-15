@@ -24,7 +24,6 @@ import {
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
-  ReportProblem as IncidentIcon,
   DevicesOther as DeviceIcon,
   Contacts as ContactIcon,
   Settings as SettingsIcon,
@@ -60,7 +59,6 @@ const Layout = ({ children }) => {
 
   const menuItems = [
     { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
-    { text: 'Incidents', icon: <IncidentIcon />, path: '/incidents' },
     { text: 'Devices', icon: <DeviceIcon />, path: '/devices' },
     { text: 'Contacts', icon: <ContactIcon />, path: '/contacts' },
     { text: 'Settings', icon: <SettingsIcon />, path: '/settings' },

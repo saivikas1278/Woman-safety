@@ -202,8 +202,7 @@ const deviceSchema = new mongoose.Schema({
   timestamps: true
 });
 
-// Indexes
-deviceSchema.index({ serialNumber: 1 });
+// Indexes (serialNumber index is created automatically by unique: true)
 deviceSchema.index({ user: 1 });
 deviceSchema.index({ location: '2dsphere' });
 deviceSchema.index({ status: 1, isActive: 1 });

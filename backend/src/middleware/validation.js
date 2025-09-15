@@ -26,14 +26,19 @@ const validateRegistration = [
     .withMessage('Please provide a valid email'),
   
   body('phone')
-    .isMobilePhone()
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('password')
     .isLength({ min: 8 })
     .withMessage('Password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
     .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
+  
+  body('role')
+    .optional()
+    .isIn(['user', 'volunteer', 'admin'])
+    .withMessage('Invalid role specified'),
   
   handleValidationErrors
 ];
@@ -48,7 +53,7 @@ const validateLogin = [
   
   body('phone')
     .optional()
-    .isMobilePhone()
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('password')
@@ -122,7 +127,7 @@ const validateContact = [
     .withMessage('Contact name must be between 2 and 100 characters'),
   
   body('phone')
-    .isMobilePhone()
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('relationship')
@@ -203,7 +208,7 @@ const validateProfileUpdate = [
   
   body('phone')
     .optional()
-    .isMobilePhone()
+    .matches(/^[\+]?[1-9][\d]{0,15}$/)
     .withMessage('Please provide a valid phone number'),
   
   body('profile.dateOfBirth')
@@ -228,7 +233,7 @@ const validatePasswordChange = [
   body('newPassword')
     .isLength({ min: 8 })
     .withMessage('New password must be at least 8 characters long')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
+    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]+$/)
     .withMessage('New password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
   
   body('confirmPassword')

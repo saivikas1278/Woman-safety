@@ -42,11 +42,14 @@ const schema = yup.object({
     .min(8, 'Password must be at least 8 characters')
     .matches(/(?=.*[a-z])/, 'Password must contain a lowercase letter')
     .matches(/(?=.*[A-Z])/, 'Password must contain an uppercase letter')
-    .matches(/(?=.*\d)/, 'Password must contain a number'),
+    .matches(/(?=.*\d)/, 'Password must contain a number')
+    .matches(/(?=.*[@$!%*?&])/, 'Password must contain a special character (@$!%*?&)'),
   confirmPassword: yup.string()
     .required('Please confirm your password')
     .oneOf([yup.ref('password')], 'Passwords must match'),
-  phone: yup.string().required('Phone number is required'),
+  phone: yup.string()
+    .required('Phone number is required')
+    .matches(/^[\+]?[1-9][\d]{0,15}$/, 'Please provide a valid phone number'),
   role: yup.string().required('Please select a role'),
   termsAccepted: yup.boolean().oneOf([true], 'You must accept the terms and conditions'),
 });

@@ -9,10 +9,6 @@ import {
   setError,
 } from '../../store/slices/socketSlice';
 import {
-  updateIncident,
-  addLocationUpdate,
-} from '../../store/slices/incidentSlice';
-import {
   updateDevice,
   updateDeviceLocation,
   updateDeviceTelemetry,
@@ -69,79 +65,6 @@ const SocketManager = () => {
       dispatch(setError(error.message));
     });
 
-    // Incident-related events
-    newSocket.on('incident_created', (incident) => {
-      dispatch(updateIncident(incident));
-      
-      // Show emergency alert if it's the user's incident
-      if (incident.user === user._id) {
-        dispatch(setEmergencyAlert({
-          type: 'incident_created',
-          incident,
-          message: 'Emergency incident created successfully',
-        }));
-      }
-
-      // Add notification
-      dispatch(addNotification({
-        type: 'incident',
-        title: 'New Emergency Incident',
-        message: `Emergency incident created${incident.user === user._id ? '' : ' by another user'}`,
-        severity: 'error',
-        data: incident,
-      }));
-    });
-
-    newSocket.on('incident_updated', (incident) => {
-      dispatch(updateIncident(incident));
-      
-      // Add notification for status changes
-      dispatch(addNotification({
-        type: 'incident',
-        title: 'Incident Updated',
-        message: `Incident status changed to ${incident.status}`,
-        severity: 'info',
-        data: incident,
-      }));
-    });
-
-    newSocket.on('location_update', ({ incidentId, location, user: updateUser }) => {
-      dispatch(addLocationUpdate({ incidentId, location }));
-      
-      // Add notification if it's not the current user's update
-      if (updateUser !== user._id) {
-        dispatch(addNotification({
-          type: 'location',
-          title: 'Location Update',
-          message: 'Emergency location has been updated',
-          severity: 'warning',
-          data: { incidentId, location },
-        }));
-      }
-    });
-
-    newSocket.on('responder_assigned', ({ incident, responder }) => {
-      dispatch(updateIncident(incident));
-      
-      dispatch(addNotification({
-        type: 'responder',
-        title: 'Responder Assigned',
-        message: `${responder.name} has been assigned to respond`,
-        severity: 'success',
-        data: { incident, responder },
-      }));
-    });
-
-    newSocket.on('responder_status', ({ incidentId, responder, status }) => {
-      dispatch(addNotification({
-        type: 'responder',
-        title: 'Responder Update',
-        message: `Responder is ${status}`,
-        severity: 'info',
-        data: { incidentId, responder, status },
-      }));
-    });
-
     // Device-related events
     newSocket.on('device_update', (device) => {
       dispatch(updateDevice(device));
@@ -196,23 +119,23 @@ const SocketManager = () => {
 
     // Volunteer events (for volunteers)
     if (user.role === 'volunteer' || user.role === 'admin') {
-      newSocket.on('volunteer_request', ({ incident, distance }) => {
+      newSocket.on('volunteer_request', ({ distance }) => {
         dispatch(addNotification({
           type: 'volunteer',
           title: 'Volunteer Request',
           message: `Emergency nearby (${distance}km). Can you help?`,
           severity: 'warning',
-          data: { incident, distance },
+          data: { distance },
         }));
       });
 
-      newSocket.on('volunteer_accepted', ({ volunteer, incident }) => {
+      newSocket.on('volunteer_accepted', ({ volunteer }) => {
         dispatch(addNotification({
           type: 'volunteer',
           title: 'Volunteer Accepted',
           message: `${volunteer.name} accepted the volunteer request`,
           severity: 'success',
-          data: { volunteer, incident },
+          data: { volunteer },
         }));
       });
     }
@@ -234,37 +157,22 @@ const SocketManager = () => {
   }, [token, user, dispatch]);
 
   // Helper functions to emit events
-  const joinIncidentRoom = (incidentId) => {
+  const shareDeviceLocation = (deviceId, location) => {
     if (socket && connected) {
-      socket.emit('join_incident_room', incidentId);
-      dispatch(joinRoom(`incident_${incidentId}`));
+      socket.emit('device_location_update', { deviceId, location });
     }
   };
 
-  const shareLocation = (incidentId, location) => {
+  const acceptVolunteerRequest = (requestId) => {
     if (socket && connected) {
-      socket.emit('location_update', { incidentId, location });
-    }
-  };
-
-  const updateResponderStatus = (incidentId, status) => {
-    if (socket && connected) {
-      socket.emit('responder_status', { incidentId, status });
-    }
-  };
-
-  const acceptVolunteerRequest = (incidentId) => {
-    if (socket && connected) {
-      socket.emit('accept_volunteer_request', { incidentId });
+      socket.emit('accept_volunteer_request', { requestId });
     }
   };
 
   // Expose socket functions to global scope for use in components
   React.useEffect(() => {
     window.socketHelpers = {
-      joinIncidentRoom,
-      shareLocation,
-      updateResponderStatus,
+      shareDeviceLocation,
       acceptVolunteerRequest,
     };
 

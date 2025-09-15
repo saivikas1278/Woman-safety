@@ -24,12 +24,12 @@ import {
   CheckCircle as CheckIcon,
 } from '@mui/icons-material';
 
-import { deviceService, incidentService } from '../../services/api';
+import { deviceService } from '../../services/api';
 import { fetchDevicesSuccess } from '../../store/slices/deviceSlice';
 import { addNotification } from '../../store/slices/uiSlice';
 import EmergencyButton from '../../components/Emergency/EmergencyButton';
 import QuickStats from '../../components/Dashboard/QuickStats';
-import RecentIncidents from '../../components/Dashboard/RecentIncidents';
+// ...existing code...
 import DeviceStatusCard from '../../components/Dashboard/DeviceStatusCard';
 import LocationMap from '../../components/Map/LocationMap';
 
@@ -38,13 +38,9 @@ const Dashboard = () => {
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
   const { devices } = useSelector((state) => state.devices);
-  const { incidents } = useSelector((state) => state.incidents);
   
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalIncidents: 0,
-    activeIncidents: 0,
-    resolvedIncidents: 0,
     deviceStatus: 'unknown',
   });
 
@@ -60,22 +56,8 @@ const Dashboard = () => {
       const devicesResponse = await deviceService.getDevices();
       dispatch(fetchDevicesSuccess(devicesResponse.devices || []));
       
-      // Load recent incidents
-      const incidentsResponse = await incidentService.getIncidents({ limit: 5 });
-      
-      // Calculate stats
-      const activeIncidents = incidentsResponse.incidents?.filter(i => 
-        ['active', 'escalated'].includes(i.status)
-      ).length || 0;
-      
-      const resolvedIncidents = incidentsResponse.incidents?.filter(i => 
-        i.status === 'resolved'
-      ).length || 0;
-      
+      // Calculate device stats
       setStats({
-        totalIncidents: incidentsResponse.total || 0,
-        activeIncidents,
-        resolvedIncidents,
         deviceStatus: getOverallDeviceStatus(devicesResponse.devices || []),
       });
       
@@ -193,10 +175,10 @@ const Dashboard = () => {
               <CardContent sx={{ textAlign: 'center' }}>
                 <SecurityIcon sx={{ fontSize: 40, color: 'primary.main', mb: 1 }} />
                 <Typography variant="h4" fontWeight="bold">
-                  {stats.totalIncidents}
+                  {user?.isVerified ? 'Verified' : 'Pending'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Total Incidents
+                  Account Status
                 </Typography>
               </CardContent>
             </Card>
@@ -205,12 +187,12 @@ const Dashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <WarningIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
+                <ContactIcon sx={{ fontSize: 40, color: 'warning.main', mb: 1 }} />
                 <Typography variant="h4" fontWeight="bold">
-                  {stats.activeIncidents}
+                  {user?.emergencyContacts?.length || 0}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Active Incidents
+                  Emergency Contacts
                 </Typography>
               </CardContent>
             </Card>
@@ -219,12 +201,12 @@ const Dashboard = () => {
           <Grid item xs={12} sm={6} md={3}>
             <Card>
               <CardContent sx={{ textAlign: 'center' }}>
-                <CheckIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
+                <LocationIcon sx={{ fontSize: 40, color: 'success.main', mb: 1 }} />
                 <Typography variant="h4" fontWeight="bold">
-                  {stats.resolvedIncidents}
+                  {user?.location?.coordinates ? 'Active' : 'Inactive'}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Resolved
+                  Location Sharing
                 </Typography>
               </CardContent>
             </Card>
@@ -293,7 +275,15 @@ const Dashboard = () => {
                 <Typography variant="h6" fontWeight="bold" gutterBottom>
                   Recent Activity
                 </Typography>
-                <RecentIncidents incidents={incidents.slice(0, 5)} />
+                <Box sx={{ textAlign: 'center', py: 4 }}>
+                  <SecurityIcon sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
+                  <Typography variant="body1" color="text.secondary" gutterBottom>
+                    No recent activity
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Your safety events will appear here
+                  </Typography>
+                </Box>
               </CardContent>
             </Card>
           </Grid>
@@ -309,7 +299,6 @@ const Dashboard = () => {
                   <LocationMap
                     userLocation={user?.location}
                     devices={devices}
-                    incidents={incidents.filter(i => ['active', 'escalated'].includes(i.status))}
                     height="400px"
                   />
                 </Box>

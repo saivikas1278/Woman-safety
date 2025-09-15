@@ -31,7 +31,10 @@ const generateTokens = (userId) => {
 // @access  Public
 const register = async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body;
+    const { name, email, phone, password, role } = req.body;
+    
+    // Log the received data for debugging (without password)
+    logger.info('Registration attempt:', { name, email, phone, role });
 
     // Check if user already exists
     const existingUser = await User.findOne({
@@ -39,9 +42,11 @@ const register = async (req, res) => {
     });
 
     if (existingUser) {
+      const conflictField = existingUser.email === email ? 'email' : 'phone';
+      logger.warn(`Registration failed - ${conflictField} already exists:`, { email, phone });
       return res.status(400).json({
         success: false,
-        message: 'User with this email or phone already exists'
+        message: `User with this ${conflictField} already exists`
       });
     }
 
@@ -54,6 +59,7 @@ const register = async (req, res) => {
       email,
       phone,
       password,
+      role: role || 'user', // Default to 'user' if not provided
       verificationToken
     });
 
@@ -70,7 +76,7 @@ const register = async (req, res) => {
       logger.error('Failed to send verification:', notificationError);
     }
 
-    logger.info(`New user registered: ${email}`);
+    logger.info(`New user registered successfully: ${email}`);
 
     res.status(201).json({
       success: true,
@@ -90,7 +96,35 @@ const register = async (req, res) => {
     });
 
   } catch (error) {
-    logger.error('Registration error:', error);
+    logger.error('Registration error:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
+    // Handle mongoose validation errors
+    if (error.name === 'ValidationError') {
+      const validationErrors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      
+      return res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: validationErrors
+      });
+    }
+    
+    // Handle duplicate key errors
+    if (error.code === 11000) {
+      const field = Object.keys(error.keyPattern)[0];
+      return res.status(400).json({
+        success: false,
+        message: `User with this ${field} already exists`
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Failed to register user'
