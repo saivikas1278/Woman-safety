@@ -29,8 +29,13 @@ const server = createServer(app);
 // Socket.IO setup
 const io = new Server(server, {
   cors: {
-    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001",
+      process.env.CORS_ORIGIN || "http://localhost:3000"
+    ],
+    methods: ["GET", "POST"],
+    credentials: true
   }
 });
 
@@ -40,7 +45,11 @@ connectDB();
 // Security middleware
 app.use(helmet());
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    process.env.CORS_ORIGIN || "http://localhost:3000"
+  ],
   credentials: true
 }));
 
@@ -102,11 +111,41 @@ app.use('*', (req, res) => {
 // Error handling middleware
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
+// Port configuration with fallback mechanism
+const startServer = (port) => {
+  server.listen(port, '0.0.0.0', () => {
+    logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${port}`);
+    
+    // Store the current port for potential use by other services
+    process.env.CURRENT_PORT = port;
+    
+    // Try to write the port to a file that can be read by the frontend
+    try {
+      const fs = require('fs');
+      fs.writeFileSync('./port.txt', port.toString());
+    } catch (err) {
+      logger.warn(`Could not write port to file: ${err.message}`);
+    }
+  });
+};
 
-server.listen(PORT, () => {
-  logger.info(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+// Handle server errors
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const currentPort = parseInt(process.env.PORT || 5000);
+    const newPort = currentPort + 1;
+    logger.warn(`Port ${currentPort} is in use, trying port ${newPort}`);
+    process.env.PORT = newPort;
+    server.close();
+    startServer(newPort);
+  } else {
+    logger.error(`Server error: ${err.message}`);
+    process.exit(1);
+  }
 });
+
+const PORT = parseInt(process.env.PORT || 5000);
+startServer(PORT);
 
 // Graceful shutdown
 process.on('SIGTERM', () => {

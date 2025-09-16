@@ -25,7 +25,7 @@ import NotFoundPage from './pages/NotFound/NotFoundPage';
 
 // Services
 import { authService } from './services/authService';
-import { setAuthenticated, loginStart, loginFailure } from './store/slices/authSlice';
+import { setAuthenticated, loginStart, loginFailure, loginSuccess } from './store/slices/authSlice';
 
 function App() {
   const dispatch = useDispatch();
@@ -39,9 +39,25 @@ function App() {
     // Check if user is authenticated on app load
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
+      const user = localStorage.getItem('user');
+      
       if (token) {
         dispatch(loginStart()); // Set loading to true
         try {
+          // If we have user data in localStorage, set it while verifying
+          if (user) {
+            try {
+              const userData = JSON.parse(user);
+              dispatch(loginSuccess({
+                user: userData,
+                token: token,
+                refreshToken: localStorage.getItem('refreshToken')
+              }));
+            } catch (parseError) {
+              console.error('Error parsing stored user data:', parseError);
+            }
+          }
+          
           // Add timeout to prevent infinite loading
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error('Authentication timeout')), 10000);
@@ -52,17 +68,25 @@ function App() {
             timeoutPromise
           ]);
           
-          if (response.valid) {
+          if (response.success && response.user) {
+            dispatch(loginSuccess({
+              user: response.user,
+              token: token,
+              refreshToken: localStorage.getItem('refreshToken')
+            }));
+          } else if (response.valid) {
             dispatch(setAuthenticated(true));
           } else {
             localStorage.removeItem('token');
             localStorage.removeItem('refreshToken');
+            localStorage.removeItem('user');
             dispatch(setAuthenticated(false));
           }
         } catch (error) {
           console.error('Auth check error:', error);
           localStorage.removeItem('token');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('user');
           dispatch(loginFailure('Authentication failed'));
         }
       } else {
@@ -136,16 +160,6 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-        <Route
-// ...existing code...
-          element={
-            <ProtectedRoute>
-              <Layout>
-// ...existing code...
               </Layout>
             </ProtectedRoute>
           }

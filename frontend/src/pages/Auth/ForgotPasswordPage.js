@@ -42,9 +42,13 @@ const ForgotPasswordPage = () => {
     try {
       await authService.forgotPassword(data.email);
       setSent(true);
-      toast.success('Password reset email sent!');
+      toast.success('Password reset instructions sent to your email!');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to send reset email');
+      console.error('Forgot password error:', error);
+      const errorMessage = error.response?.data?.message || 
+                          error.message || 
+                          'Failed to send reset email. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

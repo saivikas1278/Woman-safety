@@ -1,6 +1,19 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Function to determine API base URL with fallback ports
+const getApiBaseUrl = () => {
+  if (process.env.REACT_APP_API_URL) return process.env.REACT_APP_API_URL;
+  
+  // Try to use localStorage to remember the working port
+  const savedPort = localStorage.getItem('api_port');
+  if (savedPort) {
+    return `http://localhost:${savedPort}/api`;
+  }
+  
+  return 'http://localhost:5000/api';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 // Create axios instance
 const api = axios.create({
@@ -24,12 +37,13 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle token refresh
+// Response interceptor to handle token refresh and connection errors
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
 
+    // Handle token refresh
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
 
@@ -54,6 +68,34 @@ api.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    
+    // Handle connection errors (try different ports)
+    if (error.code === 'ERR_NETWORK' && !originalRequest._portRetry) {
+      originalRequest._portRetry = true;
+      
+      // Get current port from URL
+      const urlParts = originalRequest.baseURL.split(':');
+      const currentPort = parseInt(urlParts[2].split('/')[0]);
+      
+      // Try next port
+      const newPort = currentPort + 1;
+      if (newPort <= 5010) { // Limit to reasonable range
+        console.log(`Connection failed, trying port ${newPort}...`);
+        
+        // Update localStorage with new port
+        localStorage.setItem('api_port', newPort);
+        
+        // Update base URL for future requests
+        const newBaseUrl = `http://localhost:${newPort}/api`;
+        api.defaults.baseURL = newBaseUrl;
+        
+        // Update current request URL
+        originalRequest.baseURL = newBaseUrl;
+        
+        // Retry with new port
+        return api(originalRequest);
+      }
+    }
 
     return Promise.reject(error);
   }
@@ -61,13 +103,41 @@ api.interceptors.response.use(
 
 export const authService = {
   login: async (email, password) => {
-    const response = await api.post('/auth/login', { email, password });
-    return response.data;
+    try {
+      const response = await api.post('/auth/login', { email, password });
+      return response.data;
+    } catch (error) {
+      // Enhanced error handling
+      if (error.response) {
+        // Server responded with error status
+        throw error;
+      } else if (error.request) {
+        // Request was made but no response received
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        // Something else went wrong
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   register: async (userData) => {
-    const response = await api.post('/auth/register', userData);
-    return response.data;
+    try {
+      const response = await api.post('/auth/register', userData);
+      return response.data;
+    } catch (error) {
+      // Enhanced error handling
+      if (error.response) {
+        // Server responded with error status
+        throw error;
+      } else if (error.request) {
+        // Request was made but no response received
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        // Something else went wrong
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   logout: async () => {
@@ -82,41 +152,111 @@ export const authService = {
   },
 
   forgotPassword: async (email) => {
-    const response = await api.post('/auth/forgot-password', { email });
-    return response.data;
+    try {
+      const response = await api.post('/auth/forgot-password', { email });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   resetPassword: async (token, password) => {
-    const response = await api.post('/auth/reset-password', { token, password });
-    return response.data;
+    try {
+      const response = await api.post('/auth/reset-password', { token, password });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   verifyEmail: async (token) => {
-    const response = await api.post('/auth/verify-email', { token });
-    return response.data;
+    try {
+      const response = await api.post('/auth/verify-email', { token });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   verifyToken: async () => {
-    const response = await api.get('/auth/verify-token');
-    return response.data;
+    try {
+      const response = await api.get('/auth/verify-token');
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   getProfile: async () => {
-    const response = await api.get('/auth/profile');
-    return response.data;
+    try {
+      const response = await api.get('/auth/profile');
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   updateProfile: async (userData) => {
-    const response = await api.put('/auth/profile', userData);
-    return response.data;
+    try {
+      const response = await api.put('/auth/profile', userData);
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 
   changePassword: async (currentPassword, newPassword) => {
-    const response = await api.put('/auth/change-password', {
-      currentPassword,
-      newPassword,
-    });
-    return response.data;
+    try {
+      const response = await api.put('/auth/change-password', {
+        currentPassword,
+        newPassword,
+      });
+      return response.data;
+    } catch (error) {
+      if (error.response) {
+        throw error;
+      } else if (error.request) {
+        throw new Error('Unable to connect to server. Please check your internet connection.');
+      } else {
+        throw new Error('An unexpected error occurred. Please try again.');
+      }
+    }
   },
 };
 

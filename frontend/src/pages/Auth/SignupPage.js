@@ -32,26 +32,35 @@ import {
 } from '@mui/icons-material';
 
 import { authService } from '../../services/authService';
-import { loginSuccess } from '../../store/slices/authSlice';
+import { loginSuccess, loginStart, loginFailure } from '../../store/slices/authSlice';
 
 const schema = yup.object({
-  name: yup.string().required('Full name is required').min(2, 'Name must be at least 2 characters'),
-  email: yup.string().email('Invalid email').required('Email is required'),
+  name: yup.string()
+    .required('Full name is required')
+    .min(2, 'Name must be at least 2 characters')
+    .max(50, 'Name must be less than 50 characters')
+    .matches(/^[a-zA-Z\s]+$/, 'Name can only contain letters and spaces'),
+  email: yup.string()
+    .email('Please enter a valid email address')
+    .required('Email is required'),
   password: yup.string()
     .required('Password is required')
     .min(8, 'Password must be at least 8 characters')
-    .matches(/(?=.*[a-z])/, 'Password must contain a lowercase letter')
-    .matches(/(?=.*[A-Z])/, 'Password must contain an uppercase letter')
-    .matches(/(?=.*\d)/, 'Password must contain a number')
-    .matches(/(?=.*[@$!%*?&])/, 'Password must contain a special character (@$!%*?&)'),
+    .matches(/(?=.*[a-z])/, 'Password must contain at least one lowercase letter')
+    .matches(/(?=.*[A-Z])/, 'Password must contain at least one uppercase letter')
+    .matches(/(?=.*\d)/, 'Password must contain at least one number')
+    .matches(/(?=.*[@$!%*?&])/, 'Password must contain at least one special character (@$!%*?&)'),
   confirmPassword: yup.string()
     .required('Please confirm your password')
     .oneOf([yup.ref('password')], 'Passwords must match'),
   phone: yup.string()
     .required('Phone number is required')
-    .matches(/^[\+]?[1-9][\d]{0,15}$/, 'Please provide a valid phone number'),
-  role: yup.string().required('Please select a role'),
-  termsAccepted: yup.boolean().oneOf([true], 'You must accept the terms and conditions'),
+    .matches(/^[\+]?[\d\s\-\(\)]{10,15}$/, 'Please provide a valid phone number'),
+  role: yup.string()
+    .required('Please select a role')
+    .oneOf(['user', 'volunteer'], 'Please select a valid role'),
+  termsAccepted: yup.boolean()
+    .oneOf([true], 'You must accept the terms and conditions'),
 });
 
 const SignupPage = () => {
@@ -75,15 +84,19 @@ const SignupPage = () => {
 
   const onSubmit = async (data) => {
     setLoading(true);
+    dispatch(loginStart());
     try {
       const { confirmPassword, termsAccepted, ...userData } = data;
       const response = await authService.register(userData);
       
+      // Handle response structure - backend returns success/data format
+      const responseData = response.success ? response.data : response;
+      
       // Transform the response to match what authSlice expects
       const authData = {
-        user: response.data.user,
-        token: response.data.accessToken,
-        refreshToken: response.data.refreshToken
+        user: responseData.user,
+        token: responseData.accessToken,
+        refreshToken: responseData.refreshToken
       };
       
       // Auto-login after registration
@@ -91,7 +104,22 @@ const SignupPage = () => {
       toast.success('Account created successfully!');
       navigate('/dashboard');
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Registration failed');
+      console.error('Registration error:', error);
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      // Determine the type of error
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Unable to connect to server. The system is trying alternative ports. Please try again in a moment.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        errorMessage = error.response.data.errors.map(err => err.message).join(', ');
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      dispatch(loginFailure(errorMessage));
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

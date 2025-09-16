@@ -27,11 +27,15 @@ import {
 } from '@mui/icons-material';
 
 import { authService } from '../../services/authService';
-import { loginSuccess } from '../../store/slices/authSlice';
+import { loginSuccess, loginStart, loginFailure } from '../../store/slices/authSlice';
 
 const schema = yup.object({
-  email: yup.string().email('Invalid email').required('Email is required'),
-  password: yup.string().required('Password is required'),
+  email: yup.string()
+    .email('Please enter a valid email address')
+    .required('Email is required'),
+  password: yup.string()
+    .required('Password is required')
+    .min(1, 'Password is required'),
 });
 
 const LoginPage = () => {
@@ -53,21 +57,39 @@ const LoginPage = () => {
 
   const onSubmit = async (data) => {
     setLoading(true);
+    dispatch(loginStart());
     try {
       const response = await authService.login(data.email, data.password);
       
+      // Handle response structure - backend returns success/data format
+      const responseData = response.success ? response.data : response;
+      
       // Transform the response to match what authSlice expects
       const authData = {
-        user: response.data.user,
-        token: response.data.accessToken,
-        refreshToken: response.data.refreshToken
+        user: responseData.user,
+        token: responseData.accessToken,
+        refreshToken: responseData.refreshToken
       };
       
       dispatch(loginSuccess(authData));
       toast.success('Login successful!');
       navigate(from, { replace: true });
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      console.error('Login error:', error);
+      
+      // Determine the type of error
+      let errorMessage = 'Login failed. Please check your credentials.';
+      
+      if (error.code === 'ERR_NETWORK') {
+        errorMessage = 'Unable to connect to server. The system is trying alternative ports. Please try again in a moment.';
+      } else if (error.response) {
+        errorMessage = error.response.data?.message || 'Authentication failed. Please check your credentials.';
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      dispatch(loginFailure(errorMessage));
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
